@@ -2,27 +2,21 @@ const fs = require("fs").promises;
 const path = require("path");
 const sharp = require("sharp");
 
-async function resizeTrancheImagesInPlace(
+async function resizeImagesInPlace(
   baseFolder,
-  size = { width: 1200, height: 800 }
+  size = { width: 1200, height: 800 },
+  endWith = "tranche.jpg"
 ) {
-  /**
-   * Redimensionne récursivement toutes les images se terminant par "tranche.jpg"
-   * et les sauvegarde dans leurs dossiers respectifs en gardant l'arborescence
-   *
-   * @param {string} baseFolder - Dossier racine à parcourir récursivement
-   * @param {object} size - Taille de sortie {width, height}
-   */
-
   let processed = 0;
   let errors = 0;
   let totalFound = 0;
 
+  const { width, height } = size;
+
   console.log(
-    `Recherche récursive des images se terminant par "tranche.jpg" dans ${baseFolder}...\n`
+    `Recherche récursive des images se terminant par "${endWith}" dans ${baseFolder}...\n`
   );
 
-  // Fonction récursive pour parcourir les dossiers
   async function processDirectory(currentPath, relativePath = "") {
     try {
       const items = await fs.readdir(currentPath);
@@ -32,27 +26,23 @@ async function resizeTrancheImagesInPlace(
         const stats = await fs.stat(itemPath);
 
         if (stats.isDirectory()) {
-          // C'est un dossier, parcourir récursivement
           const newRelativePath = relativePath
             ? path.join(relativePath, item)
             : item;
           await processDirectory(itemPath, newRelativePath);
         } else if (
           stats.isFile() &&
-          item.toLowerCase().endsWith("tranche.jpg")
+          item.toLowerCase().endsWith(endWith.toLowerCase())
         ) {
-          // C'est un fichier tranche.jpg
           totalFound++;
 
           try {
-            // Créer le nom du fichier redimensionné dans le même dossier
-            const baseName = path.parse(item).name; // nom sans extension
+            const baseName = path.parse(item).name;
             const outputFilename = `${baseName}-${width}x${height}.jpg`;
-            const outputPath = path.join(currentPath, outputFilename); // même dossier
+            const outputPath = path.join(currentPath, outputFilename);
 
-            // Redimensionner l'image avec Sharp
             await sharp(itemPath)
-              .resize(size.width, size.height, {
+              .resize(width, height, {
                 fit: "cover",
                 position: "center",
               })
@@ -65,6 +55,7 @@ async function resizeTrancheImagesInPlace(
             const displayOutput = relativePath
               ? path.join(relativePath, outputFilename)
               : outputFilename;
+
             console.log(`✓ ${displayPath} → ${displayOutput}`);
             processed++;
           } catch (error) {
@@ -85,31 +76,32 @@ async function resizeTrancheImagesInPlace(
     }
   }
 
-  // Démarrer le parcours récursif
   await processDirectory(baseFolder);
 
   console.log(`\n=== Résumé ===`);
-  console.log(`Images "tranche.jpg" trouvées: ${totalFound}`);
+  console.log(`Images "${endWith}" trouvées: ${totalFound}`);
   console.log(`Images traitées: ${processed}`);
   console.log(`Erreurs: ${errors}`);
   console.log(`Les images redimensionnées sont dans leurs dossiers respectifs`);
 }
 
-// Utilisation
+// Utilisation CLI
 if (require.main === module) {
-  const baseFolder = process.argv[2] || "."; // Dossier racine à parcourir
+  const baseFolder = process.argv[2] || ".";
+  const width = parseInt(process.argv[3]) || 1200;
+  const height = parseInt(process.argv[4]) || 800;
+  const endWith = process.argv[5] || "tranche.jpg";
 
   console.log(
-    'Démarrage du redimensionnement in-place des images "tranche.jpg"...'
+    `Démarrage du redimensionnement in-place des images se terminant par "${endWith}"...`
   );
   console.log(`Dossier de base: ${baseFolder}`);
-  console.log(
-    `Les images redimensionnées seront créées dans leurs dossiers respectifs\n`
-  );
+  console.log(`Taille: ${width}x${height}`);
+  console.log(`Suffixe ciblé: "${endWith}"\n`);
 
-  resizeTrancheImagesInPlace(baseFolder)
+  resizeImagesInPlace(baseFolder, { width, height }, endWith)
     .then(() => console.log("\n🎉 Terminé!"))
     .catch((error) => console.error("Erreur:", error));
 }
 
-module.exports = { resizeTrancheImagesInPlace };
+module.exports = { resizeImagesInPlace };
